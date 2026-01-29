@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16
+    container_name: timescaledb
+    environment:
+      POSTGRES_PASSWORD: password
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql
+    ports:
+      - "5433:5432"
+  
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    command: sh -c "ollama serve & sleep 5 && /init-ollama.sh && wait"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./init-ollama.sh:/init-ollama.sh
+    ports:
+      - "11434:11434"
+    networks:
+      - rag-net
+
+
+networks:
+  rag-net:
+
+volumes:
+  timescale_data:
+  ollama_data:
