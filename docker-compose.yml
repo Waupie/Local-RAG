@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   timescaledb:
     image: timescale/timescaledb-ha:pg16
@@ -12,15 +10,13 @@ services:
     ports:
       - "5433:5432"
     networks:
-      - rag-net   # <- attached to the RAG network
+      - rag-net
 
   ollama:
-    image: ollama/ollama:latest
+    build: .                 # build from the Dockerfile in current directory
     container_name: ollama
-    command: sh -c "/init-ollama.sh && ollama serve"
     volumes:
       - ollama_data:/root/.ollama
-      - ./init-ollama.sh:/init-ollama.sh
     ports:
       - "11434:11434"
     networks:
