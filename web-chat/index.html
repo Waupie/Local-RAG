@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="chat-container">
+    <div id="chat-log" class="chat-log"></div>
+    <form id="chat-form" class="chat-form">
+      <input type="text" id="user-input" placeholder="Type your question..." autocomplete="off" required />
+      <input type="file" id="file-input" style="display:none" multiple webkitdirectory directory />
+      <button type="button" id="upload-btn">Upload Files/Folders</button>
+      <button type="submit">Send</button>
+    </form>
+  </div>
+  <script src="chat.js"></script>
+</body>
+</html>
