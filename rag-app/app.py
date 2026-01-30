@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import execute_values
@@ -7,7 +8,27 @@ import numpy as np
 import os
 from typing import List, Dict
 
+# Chunking utility (copied from chunk_and_ingest.py)
+def chunk_code(code, chunk_size=40, overlap=10):
+    lines = code.splitlines()
+    chunks = []
+    for i in range(0, len(lines), chunk_size - overlap):
+        chunk = lines[i:i+chunk_size]
+        if chunk:
+            chunks.append('\n'.join(chunk))
+    return chunks
+
+
 app = FastAPI(title="Local RAG API")
+
+# Allow CORS for all origins (for development)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Database connection
 def get_db_connection():
@@ -71,19 +92,21 @@ class Query(BaseModel):
 # API endpoints
 @app.post("/ingest")
 async def ingest_document(doc: Document):
-    """Ingest a document: generate embedding and store in database"""
+    """Ingest a document: chunk, generate embeddings, and store in database"""
     try:
-        embedding = get_embedding(doc.content)
+        chunks = chunk_code(doc.content, chunk_size=40, overlap=10)
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO documents (content, embedding) VALUES (%s, %s)",
-            (doc.content, embedding)
-        )
+        for chunk in chunks:
+            embedding = get_embedding(chunk)
+            cur.execute(
+                "INSERT INTO documents (content, embedding) VALUES (%s, %s)",
+                (chunk, embedding)
+            )
         conn.commit()
         cur.close()
         conn.close()
-        return {"message": "Document ingested successfully"}
+        return {"message": f"Document ingested as {len(chunks)} chunk(s)"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
