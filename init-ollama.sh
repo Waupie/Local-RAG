@@ -9,9 +9,9 @@ echo "Waiting for the server to start..."
 # Wait for the server to start
 sleep 5
 
-echo "Pulling Mistral model..."
+echo "Pulling ministral-3:3b model..."
 # Pull the required models
-ollama pull mistral
+ollama pull ministral-3:3b
 
 echo "Pulling Nomic Embed Text model..."
 ollama pull nomic-embed-text

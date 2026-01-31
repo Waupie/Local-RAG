@@ -21,6 +21,9 @@ def chunk_code(code, chunk_size=40, overlap=10):
 
 app = FastAPI(title="Local RAG API")
 
+ai_model = "ministral-3:3b"
+embed_model = "nomic-embed-text"
+
 # Allow CORS for all origins (for development)
 app.add_middleware(
     CORSMiddleware,
@@ -40,7 +43,7 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 def get_embedding(text: str) -> List[float]:
     """Get embedding from Ollama using nomic-embed-text"""
     response = requests.post(f"{OLLAMA_URL}/api/embeddings", json={
-        "model": "nomic-embed-text",
+        "model": embed_model,
         "prompt": text
     })
     if response.status_code == 200:
@@ -52,7 +55,7 @@ def generate_response(prompt: str, context: str = "") -> str:
     """Generate response using Mistral"""
     full_prompt = f"Context: {context}\n\nQuestion: {prompt}\n\nAnswer:" if context else prompt
     response = requests.post(f"{OLLAMA_URL}/api/generate", json={
-        "model": "mistral",
+        "model": ai_model,
         "prompt": full_prompt,
         "stream": False
     })
