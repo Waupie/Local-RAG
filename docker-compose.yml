@@ -15,6 +15,9 @@ services:
   ollama:
     build: .                 # build from the Dockerfile in current directory
     container_name: ollama
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - ollama_data:/root/.ollama
     ports:
