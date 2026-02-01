@@ -5,6 +5,8 @@ Clone the repo and start everything with the Docker Compose command in Quick sta
 
 GPU support is NVIDIA-only. You can run on CPU, but it will be painfully slow slow (at least with my Ryzen 3700x).
 
+You may want to change the ports in the docker compose file incase these ports are occupied already.
+
 ## What’s inside
 - **Ollama** (LLM runtime)
 - **TimescaleDB (Postgres)** with pgvector extensions
