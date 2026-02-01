@@ -1,5 +1,5 @@
 .chat-container {
-  max-width: 500px;
+  max-width: 800px;
   margin: 40px auto;
   background: #fff;
   border-radius: 8px;
@@ -18,6 +18,8 @@
   background: #f7f7f7;
   border-radius: 4px;
   font-family: monospace;
+  display: flex;
+  flex-direction: column;
 }
 
 .message {
@@ -31,6 +33,7 @@
 .user {
   background: #e0f7fa;
   align-self: flex-end;
+  margin-left: auto;
 }
 
 .rag {
@@ -62,4 +65,44 @@ button {
 }
 button:hover {
   background: #1565c0;
+}
+
+/**
+  * Code block styling
+  * Design for RAG responses
+  */
+.rag pre {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.rag pre code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  color: #fff;
+}
+
+.rag code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+.rag p {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.rag ul, .rag ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.rag blockquote {
+  border-left: 4px solid #ccc;
+  margin: 8px 0;
+  padding-left: 12px;
+  color: #666;
 }

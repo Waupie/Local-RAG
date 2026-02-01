@@ -7,7 +7,25 @@ const uploadBtn = document.getElementById('upload-btn');
 function appendMessage(text, sender) {
   const msg = document.createElement('div');
   msg.className = `message ${sender}`;
-  msg.textContent = text;
+  
+  // For RAG responses, parse markdown and highlight code
+  if (sender === 'rag') {
+    // Configure marked to use highlight.js
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+      breaks: true
+    });
+    msg.innerHTML = marked.parse(text);
+  } else {
+    // For user messages, just escape HTML and preserve newlines
+    msg.textContent = text;
+  }
+  
   chatLog.appendChild(msg);
   chatLog.scrollTop = chatLog.scrollHeight;
 }

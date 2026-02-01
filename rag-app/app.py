@@ -90,7 +90,7 @@ class Document(BaseModel):
 
 class Query(BaseModel):
     query: str
-    top_k: int = 5
+    top_k: int = 2
 
 # API endpoints
 @app.post("/ingest")
