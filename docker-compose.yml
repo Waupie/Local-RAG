@@ -11,19 +11,18 @@ services:
       - "5433:5432"
     networks:
       - rag-net
-
+  
   ollama:
-    build: .                 # build from the Dockerfile in current directory
+    build: .
     container_name: ollama
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
+    gpus: all
     volumes:
       - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
     networks:
       - rag-net
+
 
   rag-app:
     build: ./rag-app
