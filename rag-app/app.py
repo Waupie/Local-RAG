@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import psycopg2
@@ -7,6 +7,8 @@ import requests
 import numpy as np
 import os
 from typing import List, Dict
+
+from file_extraction import extract_text_from_upload
 
 # Chunking utility (copied from chunk_and_ingest.py)
 def chunk_code(code, chunk_size=40, overlap=10):
@@ -92,6 +94,7 @@ class Query(BaseModel):
     query: str
     top_k: int = 2
 
+
 # API endpoints
 @app.post("/ingest")
 async def ingest_document(doc: Document):
@@ -110,6 +113,32 @@ async def ingest_document(doc: Document):
         cur.close()
         conn.close()
         return {"message": f"Document ingested as {len(chunks)} chunk(s)"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ingest-file")
+async def ingest_file(file: UploadFile = File(...)):
+    """Ingest an uploaded file (PDF or text)"""
+    try:
+        content = await file.read()
+        text = extract_text_from_upload(file.filename, content)
+        if not text:
+            raise HTTPException(status_code=400, detail="No extractable text found in file")
+        chunks = chunk_code(text, chunk_size=40, overlap=10)
+        conn = get_db_connection()
+        cur = conn.cursor()
+        for chunk in chunks:
+            embedding = get_embedding(chunk)
+            cur.execute(
+                "INSERT INTO documents (content, embedding) VALUES (%s, %s)",
+                (chunk, embedding)
+            )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"message": f"File ingested as {len(chunks)} chunk(s)"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

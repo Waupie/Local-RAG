@@ -2,7 +2,9 @@ const chatLog = document.getElementById('chat-log');
 const chatForm = document.getElementById('chat-form');
 const userInput = document.getElementById('user-input');
 const fileInput = document.getElementById('file-input');
-const uploadBtn = document.getElementById('upload-btn');
+const folderInput = document.getElementById('folder-input');
+const uploadFilesBtn = document.getElementById('upload-files-btn');
+const uploadFolderBtn = document.getElementById('upload-folder-btn');
 
 function appendMessage(text, sender) {
   const msg = document.createElement('div');
@@ -56,12 +58,16 @@ chatForm.addEventListener('submit', async (e) => {
   }
 });
 
-uploadBtn.addEventListener('click', () => {
+uploadFilesBtn.addEventListener('click', () => {
   fileInput.click();
 });
 
-fileInput.addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files);
+uploadFolderBtn.addEventListener('click', () => {
+  folderInput.click();
+});
+
+async function handleFileSelection(fileList) {
+  const files = Array.from(fileList);
   if (!files.length) return;
   for (const file of files) {
     appendMessage(`Uploading: ${file.webkitRelativePath || file.name}`, 'user');
@@ -70,10 +76,11 @@ fileInput.addEventListener('change', async (e) => {
       const content = evt.target.result;
       appendMessage('Ingesting file...', 'rag');
       try {
-        const res = await fetch('http://localhost:8000/ingest', {
+        const formData = new FormData();
+        formData.append('file', new Blob([content], { type: file.type || 'application/octet-stream' }), file.name);
+        const res = await fetch('http://localhost:8000/ingest-file', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content })
+          body: formData
         });
         const data = await res.json();
         chatLog.removeChild(chatLog.lastChild); // remove 'Ingesting file...'
@@ -87,8 +94,16 @@ fileInput.addEventListener('change', async (e) => {
         appendMessage('Error contacting RAG API.', 'rag');
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     // Wait for this file to finish before starting the next
     await new Promise(resolve => reader.onloadend = resolve);
   }
+}
+
+fileInput.addEventListener('change', async (e) => {
+  await handleFileSelection(e.target.files);
+});
+
+folderInput.addEventListener('change', async (e) => {
+  await handleFileSelection(e.target.files);
 });

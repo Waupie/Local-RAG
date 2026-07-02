@@ -12,6 +12,7 @@ You may want to change the ports in the docker compose file incase these ports a
 - **TimescaleDB (Postgres)** with pgvector extensions
 - **RAG app** (FastAPI) for ingestion and retrieval
 - **Web chat** (vanilla HTML/JS/CSS)
+- **Open WebUI** (optional chat UI for Ollama)
 
 ## Requirements
 - Docker Desktop (or Docker Engine)
@@ -25,12 +26,32 @@ You may want to change the ports in the docker compose file incase these ports a
 2. Open the web chat:
 	- http://localhost:8000 (RAG app)
 	- http://localhost:11434 (Ollama API)
+	- http://localhost:3000 (Open WebUI)
 
 ## Services
 - Ollama: http://localhost:11434
 - TimescaleDB: postgres://postgres:password@localhost:5433/postgres
 - RAG app: http://localhost:8000
+- Open WebUI: http://localhost:3000
 - Web UI to test the chat bot, open the html file (index.html)
+
+## Open WebUI
+Open WebUI is included in `docker-compose.yml` and connects to the local Ollama container.
+
+1. Start or restart services:
+	```bash
+	docker compose -f docker-compose.yml up --build -d
+	```
+2. Open Open WebUI:
+	- http://localhost:3000
+3. Create your first admin account in the browser.
+4. In Open WebUI, pick a model available in Ollama.
+
+If needed, pull models into Ollama first:
+```bash
+docker exec -it ollama ollama pull llama3.2:3b
+docker exec -it ollama ollama pull nomic-embed-text
+```
 
 ## Ingest documents
 Drop files into the chat UI using **Upload Files/Folders**.

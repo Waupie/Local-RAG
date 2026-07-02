@@ -14,8 +14,10 @@
     <div id="chat-log" class="chat-log"></div>
     <form id="chat-form" class="chat-form">
       <input type="text" id="user-input" placeholder="Type your question..." autocomplete="off" required />
-      <input type="file" id="file-input" style="display:none" multiple webkitdirectory directory />
-      <button type="button" id="upload-btn">Upload Files/Folders</button>
+      <input type="file" id="file-input" style="display:none" multiple />
+      <input type="file" id="folder-input" style="display:none" multiple webkitdirectory directory />
+      <button type="button" id="upload-files-btn">Upload Files</button>
+      <button type="button" id="upload-folder-btn">Upload Folder</button>
       <button type="submit">Send</button>
     </form>
   </div>
