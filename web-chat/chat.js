@@ -5,6 +5,7 @@ const fileInput = document.getElementById('file-input');
 const folderInput = document.getElementById('folder-input');
 const uploadFilesBtn = document.getElementById('upload-files-btn');
 const uploadFolderBtn = document.getElementById('upload-folder-btn');
+const apiBaseUrl = 'http://localhost:8044';
 
 function appendMessage(text, sender) {
   const msg = document.createElement('div');
@@ -40,7 +41,7 @@ chatForm.addEventListener('submit', async (e) => {
   userInput.value = '';
   appendMessage('...', 'rag');
   try {
-    const res = await fetch('http://localhost:8000/query', {
+    const res = await fetch(`${apiBaseUrl}/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: question })
@@ -78,7 +79,7 @@ async function handleFileSelection(fileList) {
       try {
         const formData = new FormData();
         formData.append('file', new Blob([content], { type: file.type || 'application/octet-stream' }), file.name);
-        const res = await fetch('http://localhost:8000/ingest-file', {
+        const res = await fetch(`${apiBaseUrl}/ingest-file`, {
           method: 'POST',
           body: formData
         });

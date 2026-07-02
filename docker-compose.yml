@@ -1,21 +1,18 @@
 services:
   timescaledb:
     image: timescale/timescaledb-ha:pg16
-    container_name: timescaledb
     environment:
       POSTGRES_PASSWORD: password
     volumes:
       - timescale_data:/var/lib/postgresql/data
       - ./init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql
     ports:
-      - "5433:5432"
+      - "6434:5432"
     networks:
       - rag-net
   
   ollama:
     build: .
-    container_name: ollama
-    gpus: all
     volumes:
       - ollama_data:/root/.ollama
     ports:
@@ -26,9 +23,8 @@ services:
 
   rag-app:
     build: ./rag-app
-    container_name: rag-app
     ports:
-      - "8000:8000"
+      - "8044:8044"
     networks:
       - rag-net
     depends_on:
@@ -40,7 +36,6 @@ services:
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
     depends_on:
       - ollama
     environment:
@@ -48,7 +43,7 @@ services:
     volumes:
       - open_webui_data:/app/backend/data
     ports:
-      - "3000:8080"
+      - "3044:8088"
     networks:
       - rag-net
 

@@ -1,9 +1,7 @@
 # Local-RAG
 Fully local Retrieval-Augmented Generation (RAG) with TimescaleDB for vector storage, Ollama for local LLM inference, and a simple web chat UI.
 
-Clone the repo and start everything with the Docker Compose command in Quick start. After installing the NVIDIA Container Toolkit, you may need to restart the Docker service or the Ollama container.
-
-GPU support is NVIDIA-only. You can run on CPU, but it will be painfully slow slow (at least with my Ryzen 3700x).
+Clone the repo and start everything with the Docker Compose command in Quick start. Ollama starts in CPU mode by default, so the stack works on machines without NVIDIA GPU support.
 
 You may want to change the ports in the docker compose file incase these ports are occupied already.
 
@@ -24,15 +22,15 @@ You may want to change the ports in the docker compose file incase these ports a
 	docker compose -f docker-compose.yml up --build -d
 	```
 2. Open the web chat:
-	- http://localhost:8000 (RAG app)
+	- http://localhost:8044 (RAG app)
 	- http://localhost:11434 (Ollama API)
-	- http://localhost:3000 (Open WebUI)
+	- http://localhost:3044 (Open WebUI)
 
 ## Services
 - Ollama: http://localhost:11434
-- TimescaleDB: postgres://postgres:password@localhost:5433/postgres
-- RAG app: http://localhost:8000
-- Open WebUI: http://localhost:3000
+- TimescaleDB: postgres://postgres:password@localhost:6434/postgres
+- RAG app: http://localhost:8044
+- Open WebUI: http://localhost:3044
 - Web UI to test the chat bot, open the html file (index.html)
 
 ## Open WebUI
@@ -43,7 +41,7 @@ Open WebUI is included in `docker-compose.yml` and connects to the local Ollama 
 	docker compose -f docker-compose.yml up --build -d
 	```
 2. Open Open WebUI:
-	- http://localhost:3000
+	- http://localhost:3044
 3. Create your first admin account in the browser.
 4. In Open WebUI, pick a model available in Ollama.
 
@@ -57,13 +55,13 @@ docker exec -it ollama ollama pull nomic-embed-text
 Drop files into the chat UI using **Upload Files/Folders**.
 
 ## GPU support (NVIDIA)
-This project is configured to use the NVIDIA container runtime for the Ollama container.
+If you have an NVIDIA GPU and have installed the NVIDIA Container Toolkit on the host, you can enable GPU acceleration for the Ollama container.
 
 1. Install NVIDIA drivers on the host.
 2. Install the NVIDIA Container Toolkit (host-level):
 	https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 3. Restart Docker after installation.
-4. Rebuild and restart:
+4. Rebuild and restart after adding the GPU runtime configuration back:
 	```bash
 	docker compose build ollama
 	docker compose up -d ollama
