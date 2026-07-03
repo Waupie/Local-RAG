@@ -43,7 +43,7 @@ services:
     volumes:
       - open_webui_data:/app/backend/data
     ports:
-      - "3044:8088"
+      - "8080:8080"
     networks:
       - rag-net
 

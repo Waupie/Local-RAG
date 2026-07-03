@@ -24,13 +24,13 @@ You may want to change the ports in the docker compose file incase these ports a
 2. Open the web chat:
 	- http://localhost:8044 (RAG app)
 	- http://localhost:11434 (Ollama API)
-	- http://localhost:3044 (Open WebUI)
+	- http://localhost:8080 (Open WebUI)
 
 ## Services
 - Ollama: http://localhost:11434
 - TimescaleDB: postgres://postgres:password@localhost:6434/postgres
 - RAG app: http://localhost:8044
-- Open WebUI: http://localhost:3044
+- Open WebUI: http://localhost:8080
 - Web UI to test the chat bot, open the html file (index.html)
 
 ## Open WebUI
@@ -41,7 +41,7 @@ Open WebUI is included in `docker-compose.yml` and connects to the local Ollama 
 	docker compose -f docker-compose.yml up --build -d
 	```
 2. Open Open WebUI:
-	- http://localhost:3044
+	- http://localhost:8080
 3. Create your first admin account in the browser.
 4. In Open WebUI, pick a model available in Ollama.
 
@@ -55,22 +55,23 @@ docker exec -it ollama ollama pull nomic-embed-text
 Drop files into the chat UI using **Upload Files/Folders**.
 
 ## GPU support (NVIDIA)
-If you have an NVIDIA GPU and have installed the NVIDIA Container Toolkit on the host, you can enable GPU acceleration for the Ollama container.
+If you have an NVIDIA GPU and have installed the NVIDIA Container Toolkit on the host, you can enable GPU acceleration for the Ollama container with the optional override file.
 
 1. Install NVIDIA drivers on the host.
 2. Install the NVIDIA Container Toolkit (host-level):
 	https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 3. Restart Docker after installation.
-4. Rebuild and restart after adding the GPU runtime configuration back:
+4. Rebuild and restart with the GPU override:
 	```bash
-	docker compose build ollama
-	docker compose up -d ollama
+	docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
 	```
 
 To verify GPU usage:
 ```bash
-docker logs ollama | findstr /i "gpu"
+docker logs ollama | grep -i "gpu"
 ```
+
+If you do not include the GPU override file, Ollama runs in CPU mode.
 
 ## Useful commands
 - View logs: `docker logs ollama`
