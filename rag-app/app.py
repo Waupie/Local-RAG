@@ -41,12 +41,14 @@ def get_db_connection():
 
 # Ollama API functions
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
 def get_embedding(text: str) -> List[float]:
     """Get embedding from Ollama using nomic-embed-text"""
     response = requests.post(f"{OLLAMA_URL}/api/embeddings", json={
         "model": embed_model,
-        "prompt": text
+        "prompt": text,
+        "keep_alive": OLLAMA_KEEP_ALIVE
     })
     if response.status_code == 200:
         return response.json()["embedding"]
@@ -59,7 +61,8 @@ def generate_response(prompt: str, context: str = "") -> str:
     response = requests.post(f"{OLLAMA_URL}/api/generate", json={
         "model": ai_model,
         "prompt": full_prompt,
-        "stream": False
+        "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE
     })
     if response.status_code == 200:
         return response.json()["response"]
