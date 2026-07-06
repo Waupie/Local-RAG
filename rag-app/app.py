@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import psycopg2
@@ -6,6 +6,7 @@ from psycopg2.extras import execute_values
 import requests
 import numpy as np
 import os
+import hmac
 from typing import List, Dict
 
 from file_extraction import extract_text_from_upload
@@ -42,6 +43,17 @@ def get_db_connection():
 # Ollama API functions
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
+INGEST_API_KEY = os.getenv("INGEST_API_KEY", "")
+
+def verify_ingest_api_key(x_api_key: str = Header(default="", alias="X-API-Key")):
+    """Require API key for ingestion endpoints so only trusted clients can add data."""
+    if not INGEST_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Ingestion is disabled because INGEST_API_KEY is not configured"
+        )
+    if not hmac.compare_digest(x_api_key, INGEST_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 def get_embedding(text: str) -> List[float]:
     """Get embedding from Ollama using nomic-embed-text"""
@@ -100,7 +112,7 @@ class Query(BaseModel):
 
 # API endpoints
 @app.post("/ingest")
-async def ingest_document(doc: Document):
+async def ingest_document(doc: Document, _=Depends(verify_ingest_api_key)):
     """Ingest a document: chunk, generate embeddings, and store in database"""
     try:
         chunks = chunk_code(doc.content, chunk_size=40, overlap=10)
@@ -120,7 +132,7 @@ async def ingest_document(doc: Document):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ingest-file")
-async def ingest_file(file: UploadFile = File(...)):
+async def ingest_file(_=Depends(verify_ingest_api_key), file: UploadFile = File(...)):
     """Ingest an uploaded file (PDF or text)"""
     try:
         content = await file.read()
