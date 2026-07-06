@@ -54,12 +54,6 @@ docker exec -it ollama ollama pull nomic-embed-text
 ## Ingest documents
 Drop files into the chat UI using **Upload Files/Folders**.
 
-## Make responses faster
-By default, the RAG app keeps Ollama models loaded for a short period after each request so the next question does not have to cold-start the model again.
-
-If you want to keep them resident longer, increase `OLLAMA_KEEP_ALIVE` in `docker-compose.yml` or in your environment before starting the stack.
-Setting `OLLAMA_KEEP_ALIVE=-1` tells Ollama to never unload the model after it has been loaded.
-
 ## GPU support (NVIDIA)
 If you have an NVIDIA GPU and have installed the NVIDIA Container Toolkit on the host, you can enable GPU acceleration for the Ollama container with the optional override file.
 
