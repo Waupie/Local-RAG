@@ -9,7 +9,13 @@ import os
 import hmac
 from typing import List, Dict
 
+from fastapi.responses import FileResponse
+
 from file_extraction import extract_text_from_upload
+
+from fastapi.staticfiles import StaticFiles
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Chunking utility (copied from chunk_and_ingest.py)
 def chunk_code(code, chunk_size=40, overlap=10):
@@ -34,6 +40,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(BASE_DIR, "web-chat")),
+    name="static",
 )
 
 # Database connection
@@ -213,3 +225,9 @@ async def list_documents():
     cur.close()
     conn.close()
     return {"documents": [{"id": r[0], "preview": r[1]} for r in results]}
+
+
+@app.get("/")
+async def serve_index():
+    index_path = os.path.join(BASE_DIR, "web-chat", "index.html")
+    return FileResponse(index_path, media_type="text/html")
