@@ -15,6 +15,8 @@ from file_extraction import extract_text_from_upload
 
 from fastapi.staticfiles import StaticFiles
 
+from guardrails import similarity_guardrail
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Chunking utility (copied from chunk_and_ingest.py)
@@ -56,6 +58,7 @@ def get_db_connection():
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 INGEST_API_KEY = os.getenv("INGEST_API_KEY", "")
+GUARDRAIL_SIMILARITY_THRESHOLD = float(os.getenv("GUARDRAIL_SIMILARITY_THRESHOLD", "0.5"))
 
 def verify_ingest_api_key(x_api_key: str = Header(default="", alias="X-API-Key")):
     """Require API key for ingestion endpoints so only trusted clients can add data."""
@@ -122,6 +125,21 @@ class Query(BaseModel):
     top_k: int = 2
 
 
+def search_similar(embedding: List[float], top_k: int):
+    """Find the top_k most similar chunks to the given embedding."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT content, 1 - (embedding <=> %s::vector) as similarity
+        FROM documents
+        ORDER BY embedding <=> %s::vector
+        LIMIT %s
+    """, (embedding, embedding, top_k))
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+    return results
+
 # API endpoints
 @app.post("/ingest")
 async def ingest_document(doc: Document, _=Depends(verify_ingest_api_key)):
@@ -171,40 +189,38 @@ async def ingest_file(_=Depends(verify_ingest_api_key), file: UploadFile = File(
 
 @app.post("/query")
 async def query_documents(query: Query):
-    """Query documents: find similar documents and generate response"""
+    """Query documents: guardrail against the corpus, then find similar documents and generate response"""
     try:
-        # Get query embedding
-        query_embedding = get_embedding(query.query)
+        allowed, best_similarity, matches = await similarity_guardrail(
+            query.query,
+            get_embedding_fn=get_embedding,
+            search_fn=search_similar,
+            top_k=query.top_k,
+            threshold=GUARDRAIL_SIMILARITY_THRESHOLD,
+        )
 
-        # Find similar documents
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT content, 1 - (embedding <=> %s::vector) as similarity
-            FROM documents
-            ORDER BY embedding <=> %s::vector
-            LIMIT %s
-        """, (query_embedding, query_embedding, query.top_k))
-
-        results = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        if not results:
-            return {"response": "No relevant documents found.", "sources": []}
+        if not allowed:
+            return {
+                "response": "I can only answer questions related to the documents that have been ingested.",
+                "sources": [],
+                "guardrail_triggered": True,
+                "best_similarity": best_similarity,
+            }
 
         # Combine context from top results
-        context = "\n".join([f"Document {i+1}: {content}" for i, (content, _) in enumerate(results)])
+        context = "\n".join([f"Document {i+1}: {content}" for i, (content, _) in enumerate(matches)])
 
         # Generate response
         response = generate_response(query.query, context)
 
         # Return response with sources
-        sources = [{"content": content, "similarity": float(similarity)} for content, similarity in results]
+        sources = [{"content": content, "similarity": float(similarity)} for content, similarity in matches]
 
         return {
             "response": response,
-            "sources": sources
+            "sources": sources,
+            "guardrail_triggered": False,
+            "best_similarity": best_similarity,
         }
 
     except Exception as e:
