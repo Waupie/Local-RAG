@@ -84,7 +84,7 @@ $('ingestFileBtn').addEventListener('click', async () => {
   try{
     const form = new FormData();
     form.append('file', selectedFile);
-    const res = await fetch(`${baseUrl()}/ingest-file`, {
+    const res = await fetch(`${baseUrl()}/ingest`, {
       method: 'POST',
       headers: { 'X-API-Key': key },
       body: form

@@ -12,6 +12,7 @@ from typing import List, Dict
 from fastapi.responses import FileResponse
 
 from file_extraction import extract_text_from_upload
+from web_extraction import extract_text_from_url
 
 from fastapi.staticfiles import StaticFiles
 
@@ -32,7 +33,8 @@ def chunk_code(code, chunk_size=40, overlap=10):
 
 app = FastAPI(title="Local RAG API")
 
-ai_model = "ministral-3:3b"
+#ai_model = "ministral-3:3b"
+ai_model = "mistral:7b-instruct-q4_0"
 embed_model = "nomic-embed-text"
 
 # Allow CORS for all origins (for development)
@@ -58,7 +60,7 @@ def get_db_connection():
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 INGEST_API_KEY = os.getenv("INGEST_API_KEY", "")
-GUARDRAIL_SIMILARITY_THRESHOLD = float(os.getenv("GUARDRAIL_SIMILARITY_THRESHOLD", "0.5"))
+GUARDRAIL_SIMILARITY_THRESHOLD = float(os.getenv("GUARDRAIL_SIMILARITY_THRESHOLD", "0.4"))
 
 def verify_ingest_api_key(x_api_key: str = Header(default="", alias="X-API-Key")):
     """Require API key for ingestion endpoints so only trusted clients can add data."""
@@ -84,13 +86,48 @@ def get_embedding(text: str) -> List[float]:
 
 def generate_response(prompt: str, context: str = "") -> str:
     """Generate response using Mistral"""
-    full_prompt = f"Context: {context}\n\nQuestion: {prompt}\n\nAnswer:" if context else prompt
-    response = requests.post(f"{OLLAMA_URL}/api/generate", json={
-        "model": ai_model,
-        "prompt": full_prompt,
-        "stream": False,
-        "keep_alive": OLLAMA_KEEP_ALIVE
-    })
+
+    if context:
+        full_prompt = f"""
+        You are a retrieval-based question-answering assistant.
+
+        You MUST follow these rules:
+        1. Answer ONLY using the information provided in the Context section.
+        2. Do NOT use your own knowledge, memory, training data, or assumptions.
+        3. Do NOT infer, guess, or fill in missing information.
+        4. If the answer is not explicitly contained in the Context, reply exactly:
+        "I don't have that information in the provided documents."
+        5. If a person's name appears in the Context, treat it only as the person described in the Context. Do not assume it refers to anyone else with the same name.
+        6. If the Context contains conflicting information, state that the documents contain conflicting information rather than choosing one.
+
+        Context:
+        {context}
+
+        Question:
+        {prompt}
+
+        Answer:
+        """
+    else:
+        full_prompt = (
+            "No context was provided.\n"
+            "Reply exactly: \"I don't have that information in the provided documents.\""
+        )
+
+    response = requests.post(
+        f"{OLLAMA_URL}/api/generate",
+        json={
+            "model": ai_model,
+            "prompt": full_prompt,
+            "stream": False,
+            "keep_alive": OLLAMA_KEEP_ALIVE,
+            "options": {
+                "temperature": 0,
+                "repeat_penalty": 1.1,
+            }
+        }
+    )
+
     if response.status_code == 200:
         return response.json()["response"]
     else:
@@ -117,9 +154,6 @@ async def startup_event():
     init_db()
 
 # Pydantic models
-class Document(BaseModel):
-    content: str
-
 class Query(BaseModel):
     query: str
     top_k: int = 2
@@ -142,34 +176,33 @@ def search_similar(embedding: List[float], top_k: int):
 
 # API endpoints
 @app.post("/ingest")
-async def ingest_document(doc: Document, _=Depends(verify_ingest_api_key)):
-    """Ingest a document: chunk, generate embeddings, and store in database"""
+async def ingest(
+    _=Depends(verify_ingest_api_key),
+    url: str = None,
+    text: str = None,
+    file: UploadFile = File(None),
+):
+    """Ingest a URL, raw text, or uploaded file — provide exactly one."""
     try:
-        chunks = chunk_code(doc.content, chunk_size=40, overlap=10)
-        conn = get_db_connection()
-        cur = conn.cursor()
-        for chunk in chunks:
-            embedding = get_embedding(chunk)
-            cur.execute(
-                "INSERT INTO documents (content, embedding) VALUES (%s, %s)",
-                (chunk, embedding)
-            )
-        conn.commit()
-        cur.close()
-        conn.close()
-        return {"message": f"Document ingested as {len(chunks)} chunk(s)"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        provided = sum([bool(url), bool(text), file is not None])
+        if provided != 1:
+            raise HTTPException(status_code=400, detail="Provide exactly one of: url, text, or file")
 
-@app.post("/ingest-file")
-async def ingest_file(_=Depends(verify_ingest_api_key), file: UploadFile = File(...)):
-    """Ingest an uploaded file (PDF or text)"""
-    try:
-        content = await file.read()
-        text = extract_text_from_upload(file.filename, content)
-        if not text:
-            raise HTTPException(status_code=400, detail="No extractable text found in file")
-        chunks = chunk_code(text, chunk_size=40, overlap=10)
+        if url:
+            extracted = extract_text_from_url(url)
+            source = url
+        elif text:
+            extracted = text
+            source = "raw text"
+        else:
+            content = await file.read()
+            extracted = extract_text_from_upload(file.filename, content)
+            source = file.filename
+
+        if not extracted:
+            raise HTTPException(status_code=400, detail=f"No extractable text found in {source}")
+
+        chunks = chunk_code(extracted, chunk_size=40, overlap=10)
         conn = get_db_connection()
         cur = conn.cursor()
         for chunk in chunks:
@@ -181,9 +214,11 @@ async def ingest_file(_=Depends(verify_ingest_api_key), file: UploadFile = File(
         conn.commit()
         cur.close()
         conn.close()
-        return {"message": f"File ingested as {len(chunks)} chunk(s)"}
+        return {"message": f"Ingested {len(chunks)} chunk(s)", "source": source}
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

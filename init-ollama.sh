@@ -21,6 +21,7 @@ ensure_model() {
 }
 
 # Pull the required models only if they are not already cached in the persistent volume.
+ensure_model "mistral:7b-instruct-q4_0"
 ensure_model "ministral-3:3b"
 ensure_model "nomic-embed-text"
 

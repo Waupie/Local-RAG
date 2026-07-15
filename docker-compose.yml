@@ -10,6 +10,11 @@ services:
       - "6434:5432"
     networks:
       - rag-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   
   ollama:
     build: .
@@ -24,29 +29,18 @@ services:
   rag-app:
     build: ./rag-app
     ports:
-      - "8044:8044"
+        - "8044:8044"
     networks:
-      - rag-net
+        - rag-net
     depends_on:
-      - timescaledb
-      - ollama
+      timescaledb:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     environment:
-      - DATABASE_URL=postgresql://postgres:password@timescaledb:5432/postgres
-      - OLLAMA_URL=http://ollama:11434
-      - INGEST_API_KEY=${INGEST_API_KEY}
-
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    depends_on:
-      - ollama
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-    volumes:
-      - open_webui_data:/app/backend/data
-    ports:
-      - "8080:8080"
-    networks:
-      - rag-net
+        - DATABASE_URL=postgresql://postgres:password@timescaledb:5432/postgres
+        - OLLAMA_URL=http://ollama:11434
+        - INGEST_API_KEY=${INGEST_API_KEY}
 
 networks:
   rag-net:
