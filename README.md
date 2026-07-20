@@ -193,19 +193,6 @@ docker logs ollama | grep -i gpu
 
 Without the GPU override, Ollama runs entirely on the CPU.
 
-## Troubleshooting
-
-### Shell script errors on Windows
-
-If Docker reports:
-
-```text
-exec /init-ollama.sh: no such file or directory
-```
-
-the shell script most likely has Windows (CRLF) line endings instead of Unix (LF). The repository includes a `.gitattributes` file to ensure shell scripts are checked out with the correct line endings.
-
-
 ## Some reflections
 
 ### Cosine similarity score (threshold)

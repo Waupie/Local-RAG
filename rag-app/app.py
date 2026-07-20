@@ -30,6 +30,38 @@ def chunk_code(code, chunk_size=40, overlap=10):
             chunks.append('\n'.join(chunk))
     return chunks
 
+"""
+Better chunking for natural language / resumes such as PDFs, web pages, etc.
+Splits on paragraphs and keeps overlap.
+"""
+def chunk_text(text: str, chunk_size: int = 600, overlap: int = 120) -> List[str]:
+    if not text:
+        return []
+    
+    # Split into paragraphs
+    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+    
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for para in paragraphs:
+        para_len = len(para)
+        
+        if current_length + para_len > chunk_size and current_chunk:
+            chunks.append('\n\n'.join(current_chunk))
+            # Keep last paragraph for overlap
+            current_chunk = current_chunk[-1:] if current_chunk else []
+            current_length = len(current_chunk[0]) if current_chunk else 0
+        
+        current_chunk.append(para)
+        current_length += para_len + 2
+    
+    if current_chunk:
+        chunks.append('\n\n'.join(current_chunk))
+    
+    return chunks
+
 
 app = FastAPI(title="Local RAG API")
 
@@ -72,11 +104,20 @@ def verify_ingest_api_key(x_api_key: str = Header(default="", alias="X-API-Key")
     if not hmac.compare_digest(x_api_key, INGEST_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-def get_embedding(text: str) -> List[float]:
-    """Get embedding from Ollama using nomic-embed-text"""
+def get_embedding(text: str, is_query: bool = False) -> List[float]:
+    """Get embedding from Ollama using nomic-embed-text.
+
+    nomic-embed-text is trained with task prefixes: 'search_document: ' for
+    ingested content and 'search_query: ' for queries. Without these, cosine
+    similarity between genuinely matching text comes out lower/flatter than
+    it should, which can trip the similarity guardrail even on relevant
+    content. Documents ingested before this change must be re-ingested,
+    since their stored embeddings were generated without a prefix.
+    """
+    prefix = "search_query: " if is_query else "search_document: "
     response = requests.post(f"{OLLAMA_URL}/api/embeddings", json={
         "model": embed_model,
-        "prompt": text,
+        "prompt": prefix + text,
         "keep_alive": OLLAMA_KEEP_ALIVE
     })
     if response.status_code == 200:
@@ -89,24 +130,20 @@ def generate_response(prompt: str, context: str = "") -> str:
 
     if context:
         full_prompt = f"""
-        You are a retrieval-based question-answering assistant.
+            You are a precise assistant. Answer the question using ONLY the provided Context.
 
-        You MUST follow these rules:
-        1. Answer ONLY using the information provided in the Context section.
-        2. Do NOT use your own knowledge, memory, training data, or assumptions.
-        3. Do NOT infer, guess, or fill in missing information.
-        4. If the answer is not explicitly contained in the Context, reply exactly:
-        "I don't have that information in the provided documents."
-        5. If a person's name appears in the Context, treat it only as the person described in the Context. Do not assume it refers to anyone else with the same name.
-        6. If the Context contains conflicting information, state that the documents contain conflicting information rather than choosing one.
+            Context:
+            {context}
 
-        Context:
-        {context}
+            Question: {prompt}
 
-        Question:
-        {prompt}
+            Rules:
+            - Base your answer only on the Context.
+            - If the Context doesn't contain the information, say exactly: "I don't have that information in the provided documents."
+            - Otherwise, give a clear, concise answer.
+            - Do not add external knowledge.
 
-        Answer:
+            Answer:
         """
     else:
         full_prompt = (
@@ -122,7 +159,6 @@ def generate_response(prompt: str, context: str = "") -> str:
             "stream": False,
             "keep_alive": OLLAMA_KEEP_ALIVE,
             "options": {
-                "temperature": 0,
                 "repeat_penalty": 1.1,
             }
         }
@@ -202,7 +238,8 @@ async def ingest(
         if not extracted:
             raise HTTPException(status_code=400, detail=f"No extractable text found in {source}")
 
-        chunks = chunk_code(extracted, chunk_size=40, overlap=10)
+        #chunks = chunk_code(extracted, chunk_size=40, overlap=10)
+        chunks = chunk_text(extracted) # chunk_size: int = 600, overlap: int = 120
         conn = get_db_connection()
         cur = conn.cursor()
         for chunk in chunks:
@@ -228,7 +265,7 @@ async def query_documents(query: Query):
     try:
         allowed, best_similarity, matches = await similarity_guardrail(
             query.query,
-            get_embedding_fn=get_embedding,
+            get_embedding_fn=lambda q: get_embedding(q, is_query=True),
             search_fn=search_similar,
             top_k=query.top_k,
             threshold=GUARDRAIL_SIMILARITY_THRESHOLD,
@@ -282,3 +319,23 @@ async def list_documents():
 async def serve_index():
     index_path = os.path.join(BASE_DIR, "web-chat", "index.html")
     return FileResponse(index_path, media_type="text/html")
+
+@app.post("/debug_query")
+async def debug_query(query: Query):
+    try:
+        embedding = get_embedding(query.query, is_query=True)
+        matches = search_similar(embedding, top_k=5)
+        
+        return {
+            "query": query.query,
+            "top_similarities": [round(float(sim), 4) for _, sim in matches],
+            "context_preview": [
+                {
+                    "similarity": round(float(sim), 4),
+                    "text": content[:600] + "..." if len(content) > 600 else content
+                }
+                for content, sim in matches
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
