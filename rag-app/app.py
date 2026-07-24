@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import psycopg2
@@ -9,6 +9,12 @@ import os
 import hmac
 from typing import List, Dict
 
+
+from datetime import date, datetime
+from chat_logging import save_message, save_visit, parse_device, parse_browser
+import hashlib
+
+from database import get_db_connection
 from fastapi.responses import FileResponse
 
 from file_extraction import extract_text_from_upload
@@ -83,10 +89,6 @@ app.mount(
     StaticFiles(directory=os.path.join(BASE_DIR, "web-chat")),
     name="static",
 )
-
-# Database connection
-def get_db_connection():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 # Ollama API functions
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -261,6 +263,9 @@ async def ingest(
 
 @app.post("/query")
 async def query_documents(query: Query):
+    # Save user question DO nott add this to git for god sake
+    save_message(query.query) #do not add this to git for god sake
+    #do not add this to git for god sake
     """Query documents: guardrail against the corpus, then find similar documents and generate response"""
     try:
         allowed, best_similarity, matches = await similarity_guardrail(
@@ -339,3 +344,26 @@ async def debug_query(query: Query):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Function to track visits
+@app.post("/track-visit")
+async def track_visit(request: Request):
+    body = await request.json()
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    today = str(date.today())
+
+    visitor_hash = hashlib.sha256(f"{today}-{os.getenv('BASE_SECRET')}".encode()).hexdigest()
+
+    record = {
+        "date": today,
+        "hour": datetime.utcnow().hour,
+        "path": body.get("path", "/"),
+        "referrer_domain": body.get("referrer_domain"),
+        "device": parse_device(ua),
+        "browser": parse_browser(ua),
+        "visitor_hash": visitor_hash,
+    }
+
+    save_visit(record)
+    return {"status": "ok"}
