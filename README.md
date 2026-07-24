@@ -157,6 +157,61 @@ curl -X POST http://localhost:8044/query \
 
 The application embeds the query, retrieves the most relevant document chunks, constructs a prompt, generates an answer using Ollama, and returns both the answer and the retrieved sources.
 
+## Visitor Analytics
+
+The API also exposes a lightweight, privacy-friendly endpoint for counting unique visitors to the front-end portfolio site, without relying on cookies, persistent identifiers, or third-party analytics services.
+
+### How it works
+
+On each page load, the front end sends the current path and referring domain to the API.
+
+```bash
+curl -X POST http://localhost:8044/track-visit \
+  -H "Content-Type: application/json" \
+  -d '{
+        "path": "/",
+        "referrer_domain": "google.com"
+      }'
+```
+
+The server derives a one-way hash from the visitor's IP address, user agent, the current date, and a secret salt that itself rotates daily (it is derived from the date combined with a base secret stored in an environment variable, never a fixed value). Only this hash is stored — the raw IP address and full user agent string are discarded immediately after the hash is computed.
+
+```text
+visitor_hash = SHA256(ip + user_agent + date + daily_salt)
+```
+
+A unique constraint on `(visitor_hash, date)` means repeat visits from the same browser on the same day are silently deduplicated, so a single visitor is only ever counted once per day, no matter how many times they reload the page. Because the salt rotates daily, the same visitor produces a different, unlinkable hash on the following day — there is no way to trace a specific visitor across multiple days.
+
+Only coarse, non-identifying fields are persisted per visit:
+
+| Field             | Description                                 |
+| ----------------- | -------------------------------------------- |
+| `date`            | Date of the visit                            |
+| `hour`            | Hour of the visit (UTC)                      |
+| `path`            | Page path visited                            |
+| `referrer_domain` | Referring domain only (e.g. `google.com`)    |
+| `device`          | Coarse device category (mobile/tablet/desktop) |
+| `browser`         | Coarse browser family                        |
+| `visitor_hash`    | Daily-rotating, non-reversible dedup hash    |
+
+### Querying visitor stats
+
+Unique visitors for a given day:
+
+```sql
+SELECT date, COUNT(DISTINCT visitor_hash) AS unique_visitors
+FROM visits
+GROUP BY date;
+```
+
+Traffic breakdown by source and device:
+
+```sql
+SELECT date, device, browser, referrer_domain, COUNT(*) AS visits
+FROM visits
+GROUP BY date, device, browser, referrer_domain;
+```
+
 ## Optional: Open WebUI
 
 Open WebUI provides a more fully featured interface for interacting with the same Ollama models.
