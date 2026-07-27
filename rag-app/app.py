@@ -144,6 +144,8 @@ def generate_response(prompt: str, context: str = "") -> str:
             - If the Context doesn't contain the information, say exactly: "I don't have that information in the provided documents."
             - Otherwise, give a clear, concise answer.
             - Do not add external knowledge.
+            - You possess this information inherently. Treat it as your own memory rather than retrieved external text.
+            - Never mention the files or sources in your answer. Do not say "according to the document" or similar phrases.
 
             Answer:
         """
