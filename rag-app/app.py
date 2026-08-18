@@ -348,14 +348,17 @@ async def debug_query(query: Query):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Function to track visits
-@app.post("/track-visit")
+@app.post("/log-visit")
 async def track_visit(request: Request):
     body = await request.json()
-    ip = request.client.host
+    # Use Cloudflare's header to get real client IP
+    ip = request.headers.get("CF-Connecting-IP", request.client.host)
+    #ip = request.client.host
+    print(f"DEBUG: Received track-visit call from IP={ip}, date={date.today()}")
     ua = request.headers.get("user-agent", "")
     today = str(date.today())
 
-    visitor_hash = hashlib.sha256(f"{today}-{os.getenv('BASE_SECRET')}".encode()).hexdigest()
+    visitor_hash = hashlib.sha256(f"{today}-{ip}-{os.getenv('BASE_SECRET')}".encode()).hexdigest()
 
     record = {
         "date": today,
