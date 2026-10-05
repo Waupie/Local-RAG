@@ -8,6 +8,7 @@ import numpy as np
 import os
 import hmac
 from typing import List, Dict
+from warmup import warm_up_ollama
 
 
 from datetime import date, datetime
@@ -192,6 +193,7 @@ def init_db():
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    warm_up_ollama() # Warms up model on start up and 
 
 # Pydantic models
 class Query(BaseModel):
